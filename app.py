@@ -1,5 +1,6 @@
 import io
 import openpyxl
+import pandas as pd
 import streamlit as st
 
 st.set_page_config(page_title="Nacenenie výkazu výmer SK", layout="wide")
@@ -8,8 +9,8 @@ st.title("🏗️ Automatické dopĺňanie cien do výkazu výmer")
 st.markdown(
     """
 Táto aplikácia chráni vaše texty, štruktúru aj vzorce:
-- 🔒 **100% ochrana textov a vzorcov:** Žiadne texty, popisy ani vzorce sa nemenia.
-- 💶 **Doplnenie cien:** Doplní aktuálne trhové ceny na Slovensku do zvoleného stĺpca.
+- 🔒 **100% ochrana textov a vzorcov**
+- 💶 **Doplnenie cien** podľa slovenských trhových štandardov
 """
 )
 
@@ -50,29 +51,34 @@ uploaded_file = st.file_uploader(
 
 if uploaded_file is not None:
   try:
+    # Zobrazenie náhľadu tabuľky, aby užívateľ presne videl stĺpce
+    df_preview = pd.read_excel(uploaded_file)
+    st.subheader("👀 Náhľad nahraného Excelu:")
+    st.dataframe(df_preview.head(10))
+    st.info(
+        "💡 Pozrite sa na tabuľku vyššie. Zadajte číslo stĺpca (1 = prvý stĺpec"
+        " A, 2 = druhý stĺpec B atď.), kde máte názvy položiek, a kam chcete"
+        " zapísať jednotkovú cenu."
+    )
+
     wb = openpyxl.load_workbook(uploaded_file, data_only=False)
     selected_sheet = st.selectbox(
         "Vyberte pracovný hárok (záložku) v Exceli", wb.sheetnames
     )
     ws = wb[selected_sheet]
 
-    st.success(
-        f"Súbor úspešne načítaný (Hárok: **{selected_sheet}**). Vzorce sú"
-        " zachované."
-    )
-
     col1, col2, col3 = st.columns(3)
     with col1:
       popis_col_idx = st.number_input(
-          "Stĺpec s popisom položky (číslo)", min_value=1, value=3, step=1
+          "Stĺpec s popisom položky (číslo)", min_value=1, value=2, step=1
       )
     with col2:
       cena_col_idx = st.number_input(
-          "Stĺpec pre jednotkovú cenu (číslo)", min_value=1, value=6, step=1
+          "Stĺpec pre jednotkovú cenu (číslo)", min_value=1, value=5, step=1
       )
     with col3:
       start_row = st.number_input(
-          "Prvý riadok s položkami", min_value=1, value=5, step=1
+          "Prvý riadok s položkami", min_value=1, value=4, step=1
       )
 
     if st.button("Spustiť dopĺňanie cien"):
@@ -87,7 +93,13 @@ if uploaded_file is not None:
           cena_cell.value = najdi_jednotkovu_cenu(popis_cell.value)
           zmenenych += 1
 
-      st.success(f"Úspešne doplnené jednotkové ceny pre {zmenenych} položiek!")
+      if zmenenych > 0:
+        st.success(f"Úspešne doplnené jednotkové ceny pre {zmenenych} položiek!")
+      else:
+        st.warning(
+            "⚠️ Nenašli sa žiadne položky. Skontrolujte číslo stĺpca s"
+            " popisom a začiatočný riadok z náhľadu vyššie!"
+        )
 
       output_io = io.BytesIO()
       wb.save(output_io)
